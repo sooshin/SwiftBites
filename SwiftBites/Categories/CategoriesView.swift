@@ -1,8 +1,10 @@
 import SwiftUI
+import SwiftData
 
 struct CategoriesView: View {
-  @Environment(\.storage) private var storage
+  @Environment(\.modelContext) var context
   @State private var query = ""
+  @Query private var categories: [Category]
 
   // MARK: - Body
 
@@ -11,7 +13,7 @@ struct CategoriesView: View {
       content
         .navigationTitle("Categories")
         .toolbar {
-          if !storage.categories.isEmpty {
+          if !categories.isEmpty {
             NavigationLink(value: CategoryForm.Mode.add) {
               Label("Add", systemImage: "plus")
             }
@@ -26,22 +28,31 @@ struct CategoriesView: View {
     }
   }
 
-  // MARK: - Views
-
-  @ViewBuilder
-  private var content: some View {
-    if storage.categories.isEmpty {
-      empty
-    } else {
-      list(for: storage.categories.filter {
-        if query.isEmpty {
-          return true
-        } else {
-          return $0.name.localizedStandardContains(query)
+    var filteredCategories: [Category] {
+        let categoriesPredicate = #Predicate<Category> {
+            $0.name.localizedStandardContains(query)
         }
-      })
+        let descriptor = FetchDescriptor<Category>(
+            predicate: query.isEmpty ? nil: categoriesPredicate
+        )
+        do {
+            let filteredCategory = try context.fetch(descriptor)
+            return filteredCategory
+        } catch {
+            return []
+        }
     }
-  }
+
+  // MARK: - Views
+    
+    @ViewBuilder
+    private var content: some View {
+      if categories.isEmpty {
+        empty
+      } else {
+        list(for: filteredCategories)
+      }
+    }
 
   private var empty: some View {
     ContentUnavailableView(
@@ -67,7 +78,7 @@ struct CategoriesView: View {
     )
   }
 
-  private func list(for categories: [MockCategory]) -> some View {
+  private func list(for categories: [Category]) -> some View {
     ScrollView(.vertical) {
       if categories.isEmpty {
         noResults
